@@ -1,0 +1,33 @@
+{
+  "name": "@ruby-s/rtc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juyeong-s/RTC.git"
+  },
+  "author": "juyeong-s",
+  "license": "MIT",
+  "keywords": [
+    "React",
+    "Hook",
+    "WebRTC",
+    "useRTC"
+  ],
+  "bugs": {
+    "url": "https://github.com/juyeong-s/RTC/issues"
+  },
+  "homepage": "https://github.com/juyeong-s/RTC#readme",
+  "peerDependencies": {
+    "@types/react": "^18.0.25",
+    "@types/react-dom": "^18.0.9",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "socket.io-client": "^4.5.4",
+    "@types/node": "^18.11.9"
+  }
+}
