@@ -1,24 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { Socket } from "socket.io-client";
 import { peerConnectionConfig } from "./src/config/rtc";
 import { RTC_MESSAGE } from "./src/constants/socket-message";
-import { IParticipant } from "./src/types/rtc";
-
-import useSocket from "./src/hooks/useSocket";
 
 interface IPeerConnection {
   [id: string]: RTCPeerConnection; // key: 각 클라이언트의 socketId, value: RTCPeerConnection 객체
 }
 
 interface RTCProps {
-  signalingNamespace: string;
+  socket: Socket;
+  participants: Map<string, MediaStream>;
+  setParticipants: React.Dispatch<
+    React.SetStateAction<Map<string, MediaStream>>
+  >;
 }
 
-function useRTC({ signalingNamespace }: RTCProps): IParticipant[] {
-  const socket = useSocket(signalingNamespace);
-
+function useRTC({
+  socket,
+  participants,
+  setParticipants,
+}: RTCProps): Map<string, MediaStream> {
   const myStreamRef = useRef<MediaStream | null>(null);
   const myVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [participants, setParticipants] = useState<IParticipant[]>([]);
   const peerConnectionRef = useRef<IPeerConnection | null>(null);
 
   const setMyStream = async () => {
@@ -40,6 +43,33 @@ function useRTC({ signalingNamespace }: RTCProps): IParticipant[] {
   const setPeerConnection = (peerId: string) => {
     const peerConnection = new RTCPeerConnection(peerConnectionConfig);
 
+    /* 이벤트 핸들러: Peer에게 candidate를 전달 할 필요가 있을때 마다 발생 */
+    peerConnection.addEventListener("icecandidate", (e) => {
+      socket.emit(RTC_MESSAGE.ICE_CANDIDATE, {
+        receiveId: peerId,
+        candidate: e.candidate,
+      });
+    });
+
+    /* 이벤트 핸들러: peerConnection에 새로운 트랙이 추가됐을 경우 호출됨
+      -> 누군가 내 offer를 remoteDescription에 설정했을 때?
+      -> 아니면 내가 누군가의 offer를 remoteDescription에 추가했을 때?
+    */
+    peerConnection.addEventListener("track", (e) => {
+      if (participants.has(peerId)) {
+        return;
+      }
+
+      const [peerStream] = e.streams;
+
+      // 새로운 peer를 참여자에 추가
+      setParticipants((prev) => {
+        const newState = new Map(prev);
+        newState.set(peerId, peerStream);
+        return newState;
+      });
+    });
+
     myStreamRef.current?.getTracks().forEach((track) => {
       if (!myStreamRef.current) return;
 
@@ -48,65 +78,44 @@ function useRTC({ signalingNamespace }: RTCProps): IParticipant[] {
       peerConnection.addTrack(track, myStreamRef.current);
     });
 
-    /* 이벤트 핸들러: Peer에게 candidate를 전달 할 필요가 있을때 마다 발생 */
-    peerConnection.onicecandidate = (e) => {
-      const candidate = e.candidate;
-
-      if (candidate) {
-        socket.emit(RTC_MESSAGE.ICE_CANDIDATE, {
-          receiveId: peerId,
-          candidate,
-        });
-      }
-    };
-
-    /* 이벤트 핸들러: peerConnection에 새로운 트랙이 추가됐을 경우 호출됨
-      -> 누군가 내 offer를 remoteDescription에 설정했을 때?
-      -> 아니면 내가 누군가의 offer를 remoteDescription에 추가했을 때?
-    */
-    peerConnection.ontrack = (e) => {
-      // 새로운 peer를 참여자에 추가
-      setParticipants((participants) => [
-        ...participants,
-        { socketId: peerId, stream: e.streams[0] },
-      ]);
-    };
-
     return peerConnection;
   };
 
   useEffect(() => {
-    if (!socket) return;
-
     setMyStream();
 
     /* 유저 join */
     socket.emit(RTC_MESSAGE.JOIN);
 
-    /* 다른 유저 join */
-    socket.on(RTC_MESSAGE.JOIN, ({ participants }) => {
-      participants.forEach(async (participant: IParticipant) => {
-        const { socketId } = participant;
-        const peerConnection = setPeerConnection(socketId);
+    /* 새로 들어온 유저의 socketId를 받음 */
+    socket.on(RTC_MESSAGE.JOIN, async (socketId) => {
+      console.log("들어옴", socketId);
 
-        peerConnectionRef.current = {
-          ...peerConnectionRef.current,
-          [socketId]: peerConnection,
-        };
+      const peerConnection = setPeerConnection(socketId);
 
-        const offer = await peerConnection.createOffer();
-        peerConnection.setLocalDescription(offer);
+      peerConnectionRef.current = {
+        ...peerConnectionRef.current,
+        [socketId]: peerConnection,
+      };
 
-        socket.emit(RTC_MESSAGE.OFFER, {
-          receiveId: participant.socketId,
-          offer,
-        });
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+
+      socket.emit(RTC_MESSAGE.OFFER, {
+        receiveId: socketId,
+        offer,
       });
     });
 
     /* offer 받기 */
     socket.on(RTC_MESSAGE.OFFER, async ({ senderId, offer }) => {
+      console.log("offer", senderId);
       const peerConnection = setPeerConnection(senderId);
+
+      peerConnectionRef.current = {
+        ...peerConnectionRef.current,
+        [senderId]: peerConnection,
+      };
       await peerConnection.setRemoteDescription(offer);
 
       const answer = await peerConnection.createAnswer();
@@ -118,16 +127,37 @@ function useRTC({ signalingNamespace }: RTCProps): IParticipant[] {
 
     /* answer 받기 */
     socket.on(RTC_MESSAGE.ANSWER, async ({ senderId, answer }) => {
+      console.log("answer", senderId);
+
       const peerConnection = peerConnectionRef?.current?.[senderId];
-      if (!peerConnection) return;
-      peerConnection.setRemoteDescription(answer);
+      if (!peerConnection) {
+        return console.log("Peer Connection does not exist");
+      }
+
+      await peerConnection.setRemoteDescription(answer);
     });
 
     /* ice candidate */
-    socket.on(RTC_MESSAGE.ICE_CANDIDATE, async ({ senderId, candidate }) => {
+    socket.on(RTC_MESSAGE.ICE_CANDIDATE, ({ senderId, candidate }) => {
+      console.log("ice", senderId);
       const peerConnection = peerConnectionRef?.current?.[senderId];
-      if (!peerConnection) return;
-      await peerConnection.addIceCandidate(candidate);
+
+      if (!peerConnection) {
+        return console.log("Peer Connection does not exist");
+      }
+
+      peerConnection.addIceCandidate(candidate);
+    });
+
+    /* disconnected */
+    socket.on(RTC_MESSAGE.DISCONNECTED, (senderId) => {
+      delete peerConnectionRef?.current?.[senderId];
+
+      setParticipants((prev) => {
+        const newState = new Map(prev);
+        newState.delete(senderId);
+        return newState;
+      });
     });
   }, []);
 
