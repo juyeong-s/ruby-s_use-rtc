@@ -51,10 +51,7 @@ function useRTC({
       });
     });
 
-    /* 이벤트 핸들러: peerConnection에 새로운 트랙이 추가됐을 경우 호출됨
-      -> 누군가 내 offer를 remoteDescription에 설정했을 때?
-      -> 아니면 내가 누군가의 offer를 remoteDescription에 추가했을 때?
-    */
+    /* 이벤트 핸들러: peerConnection에 새로운 트랙이 추가됐을 경우 호출됨 */
     peerConnection.addEventListener("track", (e) => {
       if (participants.has(peerId)) {
         return;
@@ -89,8 +86,6 @@ function useRTC({
 
     /* 새로 들어온 유저의 socketId를 받음 */
     socket.on(RTC_MESSAGE.JOIN, async (socketId) => {
-      console.log("들어옴", socketId);
-
       const peerConnection = setPeerConnection(socketId);
 
       peerConnectionRef.current = {
@@ -109,7 +104,6 @@ function useRTC({
 
     /* offer 받기 */
     socket.on(RTC_MESSAGE.OFFER, async ({ senderId, offer }) => {
-      console.log("offer", senderId);
       const peerConnection = setPeerConnection(senderId);
 
       peerConnectionRef.current = {
@@ -127,8 +121,6 @@ function useRTC({
 
     /* answer 받기 */
     socket.on(RTC_MESSAGE.ANSWER, async ({ senderId, answer }) => {
-      console.log("answer", senderId);
-
       const peerConnection = peerConnectionRef?.current?.[senderId];
       if (!peerConnection) {
         return console.log("Peer Connection does not exist");
@@ -138,15 +130,14 @@ function useRTC({
     });
 
     /* ice candidate */
-    socket.on(RTC_MESSAGE.ICE_CANDIDATE, ({ senderId, candidate }) => {
-      console.log("ice", senderId);
+    socket.on(RTC_MESSAGE.ICE_CANDIDATE, async ({ senderId, candidate }) => {
       const peerConnection = peerConnectionRef?.current?.[senderId];
 
       if (!peerConnection) {
         return console.log("Peer Connection does not exist");
       }
 
-      peerConnection.addIceCandidate(candidate);
+      await peerConnection.addIceCandidate(candidate);
     });
 
     /* disconnected */
