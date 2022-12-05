@@ -1,7 +1,7 @@
 {
-  "name": "@ruby-s/rtc",
+  "name": "@ruby-s/use-rtc",
   "version": "1.0.0",
-  "description": "",
+  "description": "React hook to connect to WebRTC",
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
