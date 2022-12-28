@@ -27,7 +27,9 @@
     "@types/react-dom": "^18.0.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "socket.io-client": "^4.5.4",
+    "socket.io-client": "^4.5.4"
+  },
+  "dependencies": {
     "@types/node": "^18.11.9"
   }
 }
