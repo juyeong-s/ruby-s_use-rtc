@@ -1,10 +1,12 @@
 {
   "name": "@ruby-s/use-rtc",
-  "version": "1.0.2",
+  "version": "1.0.9",
   "description": "React hook to connect to WebRTC",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -22,14 +24,12 @@
     "url": "https://github.com/juyeong-s/RTC/issues"
   },
   "homepage": "https://github.com/juyeong-s/RTC#readme",
-  "peerDependencies": {
-    "@types/react": "^18.0.25",
-    "@types/react-dom": "^18.0.9",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "socket.io-client": "^4.5.4"
-  },
   "dependencies": {
-    "@types/node": "^18.11.9"
+    "socket.io-client": "^4.5.4",
+    "typescript": "^4.9.3"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
   }
 }
