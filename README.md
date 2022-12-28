@@ -54,3 +54,7 @@ Beware that if you create io inside a component, the socket object may be recrea
 
 participants is a Map.
 The `key` is a string type `socketId`, and the `value` is a `MediaStream` type.
+
+### FYI
+
+Signaling server is yet to be deployed. We will distribute it soon
