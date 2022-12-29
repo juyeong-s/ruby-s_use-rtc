@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Socket } from "socket.io-client";
-import { peerConnectionConfig } from "./src/config/rtc";
-import { RTC_MESSAGE } from "./src/constants/socket-message";
+import { peerConnectionConfig } from "./config/rtc";
+import { RTC_MESSAGE } from "./constants/socket-message";
 
 interface IPeerConnection {
   [id: string]: RTCPeerConnection; // key: 각 클라이언트의 socketId, value: RTCPeerConnection 객체
@@ -45,10 +45,7 @@ function useRTC({
 
     /* 이벤트 핸들러: Peer에게 candidate를 전달 할 필요가 있을때 마다 발생 */
     peerConnection.addEventListener("icecandidate", (e) => {
-      socket.emit(RTC_MESSAGE.ICE_CANDIDATE, {
-        receiveId: peerId,
-        candidate: e.candidate,
-      });
+      socket.emit(RTC_MESSAGE.SEND_ICE, e.candidate, peerId);
     });
 
     /* 이벤트 핸들러: peerConnection에 새로운 트랙이 추가됐을 경우 호출됨 */
@@ -82,10 +79,10 @@ function useRTC({
     setMyStream();
 
     /* 유저 join */
-    socket.emit(RTC_MESSAGE.JOIN);
+    socket.emit(RTC_MESSAGE.SEND_HELLO);
 
     /* 새로 들어온 유저의 socketId를 받음 */
-    socket.on(RTC_MESSAGE.JOIN, async (socketId) => {
+    socket.on(RTC_MESSAGE.RECEIVE_HELLO, async (socketId) => {
       const peerConnection = setPeerConnection(socketId);
 
       peerConnectionRef.current = {
@@ -96,14 +93,11 @@ function useRTC({
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
 
-      socket.emit(RTC_MESSAGE.OFFER, {
-        receiveId: socketId,
-        offer,
-      });
+      socket.emit(RTC_MESSAGE.SEND_OFFER, offer, socketId);
     });
 
     /* offer 받기 */
-    socket.on(RTC_MESSAGE.OFFER, async ({ senderId, offer }) => {
+    socket.on(RTC_MESSAGE.RECEIVE_OFFER, async (offer, senderId) => {
       const peerConnection = setPeerConnection(senderId);
 
       peerConnectionRef.current = {
@@ -116,11 +110,11 @@ function useRTC({
       await peerConnection.setLocalDescription(answer);
 
       /* answer 전송 */
-      socket.emit(RTC_MESSAGE.ANSWER, { receiveId: senderId, answer });
+      socket.emit(RTC_MESSAGE.SEND_ANSWER, answer, senderId);
     });
 
     /* answer 받기 */
-    socket.on(RTC_MESSAGE.ANSWER, async ({ senderId, answer }) => {
+    socket.on(RTC_MESSAGE.RECEIVE_ANSWER, async (answer, senderId) => {
       const peerConnection = peerConnectionRef?.current?.[senderId];
       if (!peerConnection) {
         return console.log("Peer Connection does not exist");
@@ -130,7 +124,7 @@ function useRTC({
     });
 
     /* ice candidate */
-    socket.on(RTC_MESSAGE.ICE_CANDIDATE, async ({ senderId, candidate }) => {
+    socket.on(RTC_MESSAGE.RECEIVE_ICE, async (candidate, senderId) => {
       const peerConnection = peerConnectionRef?.current?.[senderId];
 
       if (!peerConnection) {
@@ -141,7 +135,7 @@ function useRTC({
     });
 
     /* disconnected */
-    socket.on(RTC_MESSAGE.DISCONNECTED, (senderId) => {
+    socket.on(RTC_MESSAGE.RECEIVE_BYE, (senderId) => {
       delete peerConnectionRef?.current?.[senderId];
 
       setParticipants((prev) => {
