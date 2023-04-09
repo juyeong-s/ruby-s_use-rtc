@@ -10,16 +10,10 @@ interface IPeerConnection {
 interface RTCProps {
   socket: Socket;
   participants: Map<string, MediaStream>;
-  setParticipants: React.Dispatch<
-    React.SetStateAction<Map<string, MediaStream>>
-  >;
+  setParticipants: React.Dispatch<React.SetStateAction<Map<string, MediaStream>>>;
 }
 
-function useRTC({
-  socket,
-  participants,
-  setParticipants,
-}: RTCProps): Map<string, MediaStream> {
+function useRTC({ socket, participants, setParticipants }: RTCProps): Map<string, MediaStream> {
   const myStreamRef = useRef<MediaStream | null>(null);
   const myVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionRef = useRef<IPeerConnection | null>(null);
