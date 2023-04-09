@@ -41,9 +41,7 @@ Only one object parameter is required.
 import { io } from "socket.io-client";
 
 const socket = io("SERVER_URL");
-const [participants, setParticipants] = useState<Map<string, MediaStream>>(
-  new Map()
-);
+const [participants, setParticipants] = useState<Map<string, MediaStream>>(new Map());
 
 useRTC({ socket, participants, setParticipants });
 ```
@@ -113,3 +111,12 @@ function SignalingSocketServer(io: Server) {
 
 export default SignalingSocketServer;
 ```
+
+# useSocket
+
+### Parameters
+
+**`useSocket(path: string, namespace: string);`**
+
+`path`: Base Path  
+`namespace`: socket's namespace
